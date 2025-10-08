@@ -1,0 +1,5 @@
+flake8
+mypy
+django-stubs
+black
+pre-commit
