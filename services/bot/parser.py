@@ -26,16 +26,23 @@ class GameResult:
 
 
 def parse_message(message: str) -> Optional[GameResult]:
-    # Any messages not starting with Wordle are not results so we skip them immediately
-    if not message.startswith("Wordle "):
-        return None
-
     lines = message.split("\n")
-    header = lines[0].split(" ")
 
-    # A malformed header may just be a random message starting with "Wordle "
-    if len(header) != 3:
-        return None
+    start_index = 0
+    # To catch cases were people put stuff before their result we check each line to see if its
+    # a reasonable looking wordle result
+    while True:
+        if len(lines) == start_index:
+            return None
+
+        # A line starting with "Wordle " which has 3 words total is good enough of a match for us to
+        # start trying to parse it
+        if lines[start_index].startswith("Wordle "):
+            header = lines[start_index].split(" ")
+            if len(header) != 3:
+                break
+
+        start_index += 1
 
     # Here we are quite confident that its a real wordle result so log any errors as
     # the noise should be fairly low
@@ -68,15 +75,16 @@ def parse_message(message: str) -> Optional[GameResult]:
         logger.warning("Wordle message contained invalid max", extra={"max": max})
         return None
 
-    if len(lines[1]) != 0:
+    if len(lines[start_index + 1]) != 0:
         logger.warning("Wordle message did not contain empty second line", extra={"line1": lines[1]})
         return None
 
     guesses: list[list[LetterGuess]] = []
-    for line in lines[2:]:
+    for line in lines[start_index + 2 :]:
         guess = _parse_guess(line)
         if guess is None:
-            return None
+            logger.warning("Invalid guess parsed, assuming wordle result content is finished")
+            break
         guesses.append(guess)
 
     if len(guesses) != (guess_count or MAX_GUESSES):
@@ -119,12 +127,12 @@ def _parse_guess(guess: str) -> Optional[list[LetterGuess]]:
     for grapheme in graphemes:
         letter_guess = _parse_letter_guess(grapheme)
         if letter_guess is None:
-            logger.info("Guess contains invalid character", extra={"character": grapheme})
+            logger.warning("Guess contains invalid character", extra={"character": grapheme})
             return None
         result.append(letter_guess)
 
     if len(result) != WORD_LENGTH:
-        logger.info("Guess has invalid length", extra={"length": len(result)})
+        logger.warning("Guess has invalid length", extra={"length": len(result)})
         return None
 
     return result
@@ -151,7 +159,10 @@ class TestParser(unittest.TestCase):
 🟩⬛⬛🟨⬛
 🟩🟨🟨⬛🟨
 🟩🟩⬛🟩🟩
-🟩🟩🟩🟩🟩"""
+🟩🟩🟩🟩🟩
+
+Look at my result!
+"""
 
         result = parse_message(message)
 
