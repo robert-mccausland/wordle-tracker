@@ -3,7 +3,7 @@ import discord
 import logging
 
 from apps.core.models import WordleChannel, WordleGame
-from services.bot.commands import summary
+from services.bot.commands import SummaryArguments, sodium, summary
 from services.bot.parser import LetterGuess, parse_message
 
 logger = logging.getLogger(__name__)
@@ -37,8 +37,13 @@ async def create_client() -> discord.Client:
         await _save_message(message)
 
     @tree.command(name="wordle-summary", description="Make a summary of wordle games posted in current channel")
-    async def summary_command(interaction: discord.Interaction) -> None:
-        await summary(interaction)
+    @discord.app_commands.describe(last_games="last_games")
+    async def summary_command(interaction: discord.Interaction, last_games: int | None) -> None:
+        await summary(interaction, SummaryArguments(last_games=last_games))
+
+    @tree.command(name="sodium")
+    async def sodium_command(interaction: discord.Interaction) -> None:
+        await sodium(interaction)
 
     return client
 
@@ -61,8 +66,8 @@ async def _scan_previous_messages(client: discord.Client) -> None:
                 continue
             logger.error("Error while scanning messages for guild: %s", result, exc_info=result)
 
-    except Exception:
-        logger.error("Error scanning previous messages: %s", result, exc_info=result)
+    except Exception as e:
+        logger.error("Error scanning previous messages: %s", e, exc_info=e)
 
 
 async def _scan_previous_message_for_guild(guild: discord.Guild) -> None:
