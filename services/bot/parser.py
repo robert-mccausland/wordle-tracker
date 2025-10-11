@@ -39,7 +39,7 @@ def parse_message(message: str) -> Optional[GameResult]:
         # start trying to parse it
         if lines[start_index].startswith("Wordle "):
             header = lines[start_index].split(" ")
-            if len(header) != 3:
+            if len(header) == 3:
                 break
 
         start_index += 1

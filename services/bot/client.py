@@ -3,7 +3,7 @@ import discord
 import logging
 
 from services.bot.commands import Admin, sodium, summary
-from services.bot.scanner import CHANNEL_NAME, save_message, scan_unseen_messages
+from services.bot.scanner import CHANNEL_NAME, delete_message, process_message, scan_unseen_messages
 
 logger = logging.getLogger(__name__)
 
@@ -32,7 +32,27 @@ async def create_client() -> discord.Client:
         if message.channel.name != CHANNEL_NAME:
             return
 
-        await save_message(message)
+        await process_message(message)
+
+    @client.event
+    async def on_message_edit(before: discord.Message, after: discord.Message) -> None:
+        if not isinstance(after.channel, discord.TextChannel):
+            return
+
+        if after.channel.name != CHANNEL_NAME:
+            return
+
+        await process_message(after)
+
+    @client.event
+    async def on_message_delete(message: discord.Message) -> None:
+        if not isinstance(message.channel, discord.TextChannel):
+            return
+
+        if message.channel.name != CHANNEL_NAME:
+            return
+
+        await delete_message(message)
 
     tree.add_command(sodium)
     tree.add_command(summary)

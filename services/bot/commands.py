@@ -1,4 +1,5 @@
 from datetime import date
+import enum
 import logging
 import discord
 
@@ -10,6 +11,7 @@ logger = logging.getLogger(__name__)
 
 SUMMARY_LIMIT_DEFAULT = 5
 SUMMARY_DELETE_AFTER = 60
+DEFAULT_RANKING = ["-games", "-wins", "average", "best"]
 WORDLE_EPOCH = date(2021, 6, 19)
 
 
@@ -25,18 +27,36 @@ class Admin(discord.app_commands.Group):
         try:
             await scan_messages_for_channel(interaction.channel, None)
             await interaction.edit_original_response(content="Rescanning finished!")
-        except Exception:
+        except Exception as e:
             await interaction.edit_original_response(content="Something went wrong :(")
+            logger.error("Error rescanning messages: %s", e, exc_info=e)
+
+
+class Ranking(enum.Enum):
+    GAMES = "games"
+    WINS = "wins"
+    AVERAGE = "average"
+    BEST = "best"
+
+
+RANKING_FIELD_MAP = {
+    Ranking.BEST: "best",
+    Ranking.WINS: "-wins",
+    Ranking.AVERAGE: "average",
+    Ranking.GAMES: "-games",
+}
 
 
 @discord.app_commands.command(
     name="wordle-summary", description="Make a summary of wordle games posted in current channel"
 )
-@discord.app_commands.describe(days="Number of recent days to include")
-@discord.app_commands.describe(limit="Number of autists to include in summary")
+@discord.app_commands.describe(days="Number of days to limit the summary to")
+@discord.app_commands.describe(limit="Number of autists to include")
+@discord.app_commands.describe(ranking="How to rank the autists")
 async def summary(
     interaction: discord.Interaction,
     days: int | None,
+    ranking: Ranking | None,
     limit: int = SUMMARY_LIMIT_DEFAULT,
 ) -> None:
     if interaction.channel is None or interaction.guild is None:
@@ -46,23 +66,32 @@ async def summary(
     if days is not None:
         min_wordle_game_number = _wordle_number_for_day(date.today()) - days
 
-    games = WordleGame.objects.values("user_id").filter(channel_id=interaction.channel.id)
+    games = WordleGame.objects.filter(channel_id=interaction.channel.id, is_duplicate=False).values("user_id")
 
     if min_wordle_game_number is not None:
         games = games.filter(game_number__gt=min_wordle_game_number)
 
+    order = DEFAULT_RANKING
+    if ranking is not None:
+        ranking_field = RANKING_FIELD_MAP[ranking]
+        order = [ranking_field] + [x for x in order if x != ranking_field]
+
     summary = games.annotate(
-        total_games=Count("message_id"),
+        games=Count("message_id"),
         wins=Count("message_id", filter=Q(is_win=True)),
-        average_guesses=Avg("guesses"),
+        average=Avg("guesses"),
         best=Min("guesses"),
-    ).order_by("-total_games", "-wins")[:limit]
+    ).order_by(*order)[:limit]
 
     rank = 1
 
     title = "🏆 Top Autists 🏆"
+
     if days is not None:
-        title += f" (last {days} days)"
+        title += f" | last {days} days"
+
+    if ranking is not None:
+        title += f" | ranked by {ranking.value}"
 
     response = discord.Embed(title=title, color=0x00FF00)
     async for row in summary.aiterator():
@@ -75,9 +104,9 @@ async def summary(
 
         row_summary = (
             f"Wins: {row['wins']}, "
-            f"Games: {row['total_games']}, "
+            f"Games: {row['games']}, "
             f"Best: {row['best']}, "
-            f"Average: {row['average_guesses']:.1f}"
+            f"Average: {row['average']:.1f}"
         )
 
         response.add_field(

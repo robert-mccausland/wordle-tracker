@@ -4,6 +4,8 @@ import discord
 
 from apps.core.models import WordleChannel, WordleGame
 from services.bot.parser import LetterGuess, parse_message
+from django.db.models import Q
+from django.utils import timezone
 
 logger = logging.getLogger(__name__)
 
@@ -46,13 +48,33 @@ async def _scan_unseen_messages_for_guild(guild: discord.Guild) -> None:
 
 async def scan_messages_for_channel(channel: discord.TextChannel, from_message_id: discord.Object | None) -> None:
     new_last_seen = None
+
+    scan_started_at = timezone.now()
     try:
-        async for message in channel.history(after=from_message_id, oldest_first=True):
-            await save_message(message)
+        async for message in channel.history(limit=None, after=from_message_id, oldest_first=True):
+            await process_message(message)
             new_last_seen = message
     finally:
         if new_last_seen is not None:
             await _update_last_seen_message(new_last_seen)
+
+    if new_last_seen is None:
+        return
+
+    # Remove games which we did not just scan and are in the interval
+    filters = {
+        "scanned_at__lt": scan_started_at,
+        "message_id__lte": new_last_seen.id,
+    }
+
+    if from_message_id is not None:
+        filters["message_id__gt"] = from_message_id.id
+
+    deleted_count, _ = await WordleGame.objects.filter(**filters).adelete()
+    if deleted_count > 0:
+        logger.info(
+            f"Deleted {deleted_count} games which are no longer in the channel", extra={"channel_id": channel.id}
+        )
 
 
 def _map_guess(guess: list[LetterGuess]) -> int:
@@ -65,7 +87,7 @@ def _map_guess(guess: list[LetterGuess]) -> int:
     return result
 
 
-async def save_message(message: discord.Message) -> None:
+async def process_message(message: discord.Message) -> None:
     assert message.guild is not None, "Expected message to be in a guild channel"
 
     result = parse_message(message.content)
@@ -73,20 +95,33 @@ async def save_message(message: discord.Message) -> None:
     if result is None:
         return
 
-    await WordleGame.objects.aget_or_create(
+    is_duplicate = await WordleGame.objects.filter(
+        game_number=result.game_number,
+        user_id=message.author.id,
+        channel_id=message.channel.id,
+        message_id__lt=message.id,
+    ).aexists()
+
+    await WordleGame.objects.aupdate_or_create(
         message_id=message.id,
         defaults=dict(
             user_id=message.author.id,
             guild_id=message.guild.id,
             channel_id=message.channel.id,
-            timestamp=message.created_at,
+            posted_at=message.created_at,
+            scanned_at=timezone.now(),
             game_number=result.game_number,
+            is_duplicate=is_duplicate,
             is_win=result.is_win,
             is_hard_mode=result.is_hard_mode,
             guesses=len(result.guesses),
             result=[_map_guess(g) for g in result.guesses],
         ),
     )
+
+
+async def delete_message(message: discord.Message) -> None:
+    await WordleGame.objects.filter(message_id=message.id).adelete()
 
 
 async def _update_last_seen_message(message: discord.Message) -> None:
