@@ -4,7 +4,6 @@ import discord
 
 from apps.core.models import WordleChannel, WordleGame
 from services.bot.parser import LetterGuess, parse_message
-from django.db.models import Q
 from django.utils import timezone
 
 logger = logging.getLogger(__name__)
