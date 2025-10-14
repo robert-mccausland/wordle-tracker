@@ -2,7 +2,7 @@ import asyncio
 import discord
 import logging
 
-from services.bot.commands import Admin, sodium, summary
+from services.bot.commands import Admin, daily_summary, sodium, summary
 from services.bot.scanner import CHANNEL_NAME, delete_message, process_message, scan_unseen_messages
 
 logger = logging.getLogger(__name__)
@@ -56,7 +56,8 @@ async def create_client() -> discord.Client:
 
     tree.add_command(sodium)
     tree.add_command(summary)
-    tree.add_command(Admin(name="admin", description="Setup and debugging commands"))
+    tree.add_command(daily_summary)
+    tree.add_command(Admin())
 
     return client
 
