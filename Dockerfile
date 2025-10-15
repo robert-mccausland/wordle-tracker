@@ -8,9 +8,11 @@ COPY requirements.txt .
 
 RUN pip install -r requirements.txt
 
-COPY Makefile manage.py ./
+COPY Makefile manage.py ./docker/entrypoint.sh ./
 COPY ./apps ./apps
 COPY ./services ./services
 COPY ./wordletracker ./wordletracker
 
-CMD ["make", "run-bot"]
+RUN chmod +x ./entrypoint.sh
+
+ENTRYPOINT ["./entrypoint.sh"]

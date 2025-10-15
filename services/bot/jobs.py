@@ -9,6 +9,7 @@ import discord
 
 from services.bot.config import CHANNEL_NAME, CLIENT_WAIT_TIMEOUT
 from services.bot.summarizer import Summarizer
+from wordletracker.settings import DB_PATH
 
 logger = logging.getLogger(__name__)
 
@@ -27,8 +28,8 @@ class JobScheduler:
         global services
         assert services is None, "JobScheduler must only be created once"
         services = Services(client)
-
-        jobstores = {"default": SQLAlchemyJobStore(url="sqlite:///scheduler.sqlite")}
+        path = DB_PATH / "scheduler.sqlite"
+        jobstores = {"default": SQLAlchemyJobStore(url=f"sqlite:///{path}")}
         self.scheduler = AsyncIOScheduler(jobstores=jobstores, event_loop=event_loop)
         self.scheduler.add_job(
             _daily_summary,
