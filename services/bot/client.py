@@ -3,11 +3,11 @@ import discord
 import logging
 
 from services.bot.commands import Admin, daily_summary, sodium, summary
+from services.bot.config import SCAN_MESSAGES_INTERVAL
+from services.bot.jobs import JobScheduler
 from services.bot.scanner import CHANNEL_NAME, delete_message, process_message, scan_unseen_messages
 
 logger = logging.getLogger(__name__)
-
-SCAN_MESSAGES_INTERVAL = 300
 
 
 async def create_client() -> discord.Client:
@@ -15,14 +15,17 @@ async def create_client() -> discord.Client:
     intents.message_content = True
 
     logger.info("Starting Discord client...")
+    event_loop = asyncio.get_running_loop()
     client = discord.Client(intents=intents)
     tree = discord.app_commands.CommandTree(client)
+    scheduler = JobScheduler(event_loop, client)
 
     @client.event
     async def on_ready() -> None:
         await tree.sync()
         logger.info("Discord client is ready", extra={"user": client.user})
-        asyncio.get_running_loop().create_task(_scan_previous_messages_task(client))
+        event_loop.create_task(_scan_previous_messages_task(client))
+        scheduler.start()
 
     @client.event
     async def on_message(message: discord.Message) -> None:
@@ -53,6 +56,10 @@ async def create_client() -> discord.Client:
             return
 
         await delete_message(message)
+
+    @client.event
+    async def on_close() -> None:
+        scheduler.stop()
 
     tree.add_command(sodium)
     tree.add_command(summary)

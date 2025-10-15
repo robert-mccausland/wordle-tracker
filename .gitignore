@@ -6,7 +6,9 @@ __pycache__/
 # Virtual Environment
 .venv
 
-# Django
+# Local Databases
 *.sqlite3
+*.sqlite
 
+# Local configuration
 .env

@@ -2,35 +2,26 @@ import django
 import os
 import sys
 import asyncio
+import logging
+from dotenv import load_dotenv
 
-os.environ.setdefault("DJANGO_SETTINGS_MODULE", "wordletracker.settings")
-django.setup()
-
-import logging  # noqa: E402
-
+load_dotenv()
 logging.basicConfig(
     level=logging.INFO,  # show INFO and above
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
 )
+os.environ.setdefault("DJANGO_SETTINGS_MODULE", "wordletracker.settings")
+django.setup()
 logger = logging.getLogger(__name__)
 
-from dotenv import load_dotenv  # noqa: E402
-
-load_dotenv()
-
-from services.bot.client import create_client  # noqa: E402
+# Some setup code importantly needs to be ran before the rest of the app is imported
+from services.bot.startup import startup  # noqa: E402
 
 
-async def main() -> int:
-    token = os.getenv("TOKEN")
-    if token is None:
-        logger.error("Expected TOKEN environment variable to be provided")
-        return 1
-
-    client = await create_client()
-    await client.start(token)
-    return 0
+def main() -> int:
+    return asyncio.run(startup())
 
 
 if __name__ == "__main__":
-    sys.exit(asyncio.run(main()))
+    exit_code = main()
+    sys.exit(exit_code)
