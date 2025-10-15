@@ -8,6 +8,7 @@ import logging
 import discord
 
 from services.bot.config import CHANNEL_NAME, CLIENT_WAIT_TIMEOUT
+from services.bot.scanner import scan_unseen_messages
 from services.bot.summarizer import Summarizer
 from wordletracker.settings import DB_PATH
 
@@ -37,12 +38,25 @@ class JobScheduler:
             id="daily_summary",
             replace_existing=True,
         )
+        self.scheduler.add_job(
+            _scan_unseen_messages,
+            CronTrigger(minute="*/5", timezone="Europe/London"),
+            id="scan_unseen_messages",
+            replace_existing=True,
+        )
 
-    def start(self) -> None:
+    def start(self, shutdown_event: asyncio.Event) -> None:
+        async def shutdown() -> None:
+            await shutdown_event.wait()
+            self.scheduler.shutdown()
+
+        asyncio.create_task(shutdown())
         self.scheduler.start()
 
-    def stop(self) -> None:
-        self.scheduler.shutdown()
+
+async def _scan_unseen_messages() -> None:
+    assert services is not None, "Services must exist for jobs to run"
+    await scan_unseen_messages(services.client)
 
 
 async def _daily_summary() -> None:

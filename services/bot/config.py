@@ -33,11 +33,10 @@ def _get_env_bool(name: str, default: bool) -> bool:
         raise ValueError(f"Environment variable {name} must be a boolean ('TRUE' or 'FALSE'), got '{value}'")
 
 
+TOKEN = _get_env("TOKEN")
 CHANNEL_NAME = _get_env("CHANNEL_NAME", "wordle")
-SCAN_MESSAGES_INTERVAL = _get_env_int("SCAN_MESSAGES_INTERVAL", 300)
 SUMMARY_LIMIT_DEFAULT = _get_env_int("SUMMARY_LIMIT_DEFAULT", 5)
 SUMMARY_DELETE_AFTER = _get_env_int("SUMMARY_DELETE_AFTER", 60)
 USERNAME_MAX_LENGTH = _get_env_int("USERNAME_MAX_LENGTH", 12)
 CLIENT_WAIT_TIMEOUT = _get_env_int("CLIENT_WAIT_TIMEOUT", 60)
 SYNC_COMMANDS = _get_env_bool("SYNC_COMMANDS", True)
-TOKEN = _get_env("TOKEN")
