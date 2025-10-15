@@ -84,7 +84,7 @@ python manage.py runserver
 To run the bot you will need to configure it with a token to access discord's servers.
 
 ```bash
-cp ./services/bot/.env.example ./services/bot/.env
+cp .env.example .env
 ```
 
 Fill the `TOKEN` variable with your secret discord token, which you can get from the [discord developer portal](https://discord.com/developers/applications)

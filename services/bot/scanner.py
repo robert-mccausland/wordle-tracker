@@ -3,7 +3,7 @@ import logging
 import discord
 
 from apps.core.models import WordleChannel, WordleGame
-from services.bot.config import CHANNEL_NAME
+from services.bot.config import CHANNEL_NAME, CLIENT_WAIT_TIMEOUT
 from services.bot.parser import LetterGuess, parse_message
 from django.utils import timezone
 
@@ -11,6 +11,8 @@ logger = logging.getLogger(__name__)
 
 
 async def scan_unseen_messages(client: discord.Client) -> None:
+    await asyncio.wait_for(client.wait_until_ready(), timeout=CLIENT_WAIT_TIMEOUT)
+
     logger.info("Scanning previous messages")
     try:
         guilds = [guild async for guild in client.fetch_guilds()]

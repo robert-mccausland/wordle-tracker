@@ -1,4 +1,5 @@
 from asyncio import AbstractEventLoop
+import asyncio
 from datetime import date, timedelta
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.jobstores.sqlalchemy import SQLAlchemyJobStore
@@ -6,7 +7,7 @@ from apscheduler.triggers.cron import CronTrigger
 import logging
 import discord
 
-from services.bot.config import CHANNEL_NAME
+from services.bot.config import CHANNEL_NAME, CLIENT_WAIT_TIMEOUT
 from services.bot.summarizer import Summarizer
 
 logger = logging.getLogger(__name__)
@@ -47,6 +48,7 @@ async def _daily_summary() -> None:
     assert services is not None, "Services must exist for jobs to run"
     logger.info("Daily summary running")
 
+    await asyncio.wait_for(services.client.wait_until_ready(), timeout=CLIENT_WAIT_TIMEOUT)
     yesterday = date.today() - timedelta(days=1)
     async for guild in services.client.fetch_guilds():
         for channel in await guild.fetch_channels():

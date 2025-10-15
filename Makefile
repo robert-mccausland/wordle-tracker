@@ -1,4 +1,4 @@
-.PHONY: format lint typecheck check ci setup manage-% run-%
+.PHONY: format lint typecheck check setup manage-% run-%
 
 format:
 	black .
@@ -10,9 +10,6 @@ typecheck:
 	mypy .
 
 check: lint typecheck
-
-ci:
-	pip install -r requirements.txt
 
 setup:
 	pip install -r requirements.txt -r requirements-dev.txt
