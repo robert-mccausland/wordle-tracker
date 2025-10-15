@@ -7,12 +7,18 @@ import asyncio
 import logging
 from dotenv import load_dotenv
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
-)
+from services.bot.logging import JsonFormatter
+
 load_dotenv(Path.cwd() / ".env")
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "wordletracker.settings")
+
+handler = logging.StreamHandler(sys.stdout)
+if os.getenv("ENVIRONMENT") == "production":
+    handler.setFormatter(JsonFormatter())
+else:
+    handler.setFormatter(logging.Formatter("%(asctime)s [%(levelname)s] %(name)s: %(message)s"))
+
+logging.basicConfig(level=logging.INFO, handlers=[handler])
 django.setup()
 
 # The above code needs to be ran before the rest of the app is imported
