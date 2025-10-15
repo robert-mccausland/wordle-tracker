@@ -10,28 +10,33 @@ from services.bot.scanner import CHANNEL_NAME, delete_message, process_message, 
 logger = logging.getLogger(__name__)
 
 
-async def run_client() -> None:
+async def run_client(shutdown_event: asyncio.Event) -> None:
     client = _WordleTrackerClient()
-    try:
-        logger.info("Logging in client...")
-        await client.login(TOKEN)
-        await client.sync_commands()
 
-        # Connect in the background so we can run some setup code once the client is ready
-        logger.info("Waiting for client to be ready...")
-        wait = asyncio.create_task(client.connect())
-        await asyncio.wait_for(client.wait_until_ready(), CLIENT_WAIT_TIMEOUT)
-
-        logger.info("Running client setup...")
-        await client.setup()
-
-        # Wait for the client to close its connection (normally will happen on SIGINT or similar)
-        logger.info("Client successfully started")
-        await wait
-        logger.warning("Client shutting down...")
-    finally:
+    async def shutdown_handler() -> None:
+        logger.info("Client stopping...")
+        await shutdown_event.wait()
         await client.close()
-        logger.warning("Client closed successfully")
+
+    wait_for_shutdown = asyncio.create_task(shutdown_handler())
+
+    logger.info("Logging in client...")
+    await client.login(TOKEN)
+    await client.sync_commands()
+
+    # Connect in the background so we can run some setup code once the client is ready
+    logger.info("Waiting for client to be ready...")
+    wait_for_close = asyncio.create_task(client.connect())
+    await asyncio.wait_for(client.wait_until_ready(), CLIENT_WAIT_TIMEOUT)
+
+    logger.info("Running client setup...")
+    await client.setup()
+    logger.info("Client successfully started")
+
+    # Wait for the client to close its connection (normally will happen on SIGINT or similar)
+    await wait_for_shutdown
+    await wait_for_close
+    logger.info("Client successfully stopped")
 
 
 class _WordleTrackerClient(discord.Client):

@@ -1,4 +1,5 @@
 from pathlib import Path
+import signal
 import django
 import os
 import sys
@@ -20,10 +21,25 @@ from services.bot.client import run_client  # noqa: E402
 logger = logging.getLogger(__name__)
 
 
-def main() -> int:
-    asyncio.run(run_client())
-    return 0
+async def main() -> int:
+    shutdown_event = asyncio.Event()
+
+    def handle_signal(signal: signal.Signals) -> None:
+        logger.warning(f"Got {signal.name} signal, shuting down")
+        shutdown_event.set()
+
+    loop = asyncio.get_running_loop()
+    for shutdown_signal in (signal.SIGTERM, signal.SIGINT):
+        loop.add_signal_handler(shutdown_signal, handle_signal, shutdown_signal)
+
+    try:
+        await run_client(shutdown_event)
+        return 0
+    except Exception as ex:
+        logger.error("Error while running client: %s", ex, exc_info=ex)
+        return 1
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    exit_code = asyncio.run(main())
+    sys.exit(exit_code)

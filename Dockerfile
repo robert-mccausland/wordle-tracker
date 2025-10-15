@@ -16,3 +16,4 @@ COPY ./wordletracker ./wordletracker
 RUN chmod +x ./entrypoint.sh
 
 ENTRYPOINT ["./entrypoint.sh"]
+CMD ["make", "run-bot"]

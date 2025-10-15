@@ -5,6 +5,5 @@ set -e
 echo "Running Django migrations..."
 python manage.py migrate --noinput
 
-# Start the bot
-echo "Starting bot..."
-make run-bot
+# Run main command
+exec "$@"
