@@ -94,3 +94,7 @@ Once you have the `.env` file setup you can run the bot:
 ```bash
 make run-bot
 ```
+
+### Deployment
+
+Code committed to the `main` branch will be automatically deployed.
