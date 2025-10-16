@@ -1,12 +1,18 @@
 from datetime import date, timedelta
+import enum
 import logging
 import discord
 
-from services.bot.config import SUMMARY_DELETE_AFTER, SUMMARY_LIMIT_DEFAULT
+from services.bot.config import SUMMARY_LIMIT_DEFAULT
 from services.bot.scanner import scan_messages_for_channel
 from services.bot.summarizer import Ranking, Summarizer
 
 logger = logging.getLogger(__name__)
+
+
+class ResponseType(enum.Enum):
+    Whisper = "Whisper"
+    Post = "Post"
 
 
 class Admin(discord.app_commands.Group):
@@ -32,11 +38,13 @@ class Admin(discord.app_commands.Group):
 @discord.app_commands.describe(days="Number of days to limit the summary to")
 @discord.app_commands.describe(limit="Max number of autists to include")
 @discord.app_commands.describe(ranking="How to rank the autists")
+@discord.app_commands.describe(response="Which format to respond to the request in")
 async def summary(
     interaction: discord.Interaction,
     days: int | None,
     ranking: Ranking | None,
     limit: int = SUMMARY_LIMIT_DEFAULT,
+    response: ResponseType = ResponseType.Whisper,
 ) -> None:
     if interaction.guild is None:
         return
@@ -45,12 +53,18 @@ async def summary(
         return
 
     summarizer = Summarizer(interaction.guild, interaction.channel)
-    response = await summarizer.get_summary(limit, date.today(), ranking, days)
-    await interaction.response.send_message(embed=response, delete_after=SUMMARY_DELETE_AFTER, silent=True)
+    embed = await summarizer.get_summary(limit, date.today(), ranking, days)
+    await interaction.response.send_message(
+        embed=embed, ephemeral=response == ResponseType.Whisper, silent=response == ResponseType.Post
+    )
 
 
 @discord.app_commands.command(name="wordle-results", description="Results of yesterdays wordle game")
-async def daily_summary(interaction: discord.Interaction) -> None:
+@discord.app_commands.describe(response="Which format to respond to the request in")
+async def daily_summary(
+    interaction: discord.Interaction,
+    response: ResponseType = ResponseType.Whisper,
+) -> None:
     if interaction.guild is None:
         return
 
@@ -59,8 +73,10 @@ async def daily_summary(interaction: discord.Interaction) -> None:
 
     summarizer = Summarizer(interaction.guild, interaction.channel)
     yesterday = date.today() - timedelta(days=1)
-    response = await summarizer.get_daily_results(yesterday)
-    await interaction.response.send_message(embed=response, delete_after=SUMMARY_DELETE_AFTER, silent=True)
+    embed = await summarizer.get_daily_results(yesterday)
+    await interaction.response.send_message(
+        embed=embed, ephemeral=response == ResponseType.Whisper, silent=response == ResponseType.Post
+    )
 
 
 @discord.app_commands.command(name="sodium", description="SODIUM")
