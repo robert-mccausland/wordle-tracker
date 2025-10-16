@@ -10,34 +10,34 @@ from services.bot.scanner import CHANNEL_NAME, delete_message, process_message
 logger = logging.getLogger(__name__)
 
 
-async def run_client(shutdown_event: asyncio.Event) -> None:
+async def run_client() -> None:
     intents: discord.Intents = discord.Intents.default()
     intents.message_content = True
     client = _WordleTrackerClient(intents=intents)
-
-    async def wait_for_shutdown() -> None:
-        await shutdown_event.wait()
-        logger.info("Client stopping...")
-        await client.close()
-
-    logger.info("Logging in client...")
-    await client.login(TOKEN)
-    await _sync_commands(client)
-
-    # Connect in the background so we can run some setup code once the client is ready
-    logger.info("Waiting for client to be ready...")
-    wait_for_close = asyncio.create_task(client.connect())
-    await asyncio.wait_for(client.wait_until_ready(), CLIENT_WAIT_TIMEOUT)
-
-    logger.info("Starting Job Scheduler...")
     scheduler = JobScheduler(asyncio.get_running_loop(), client)
-    scheduler.start(shutdown_event)
-    logger.info("Client successfully started")
 
-    # Wait for shutdown event
-    await wait_for_shutdown()
-    await wait_for_close
-    logger.info("Client successfully stopped")
+    try:
+        logger.info("Logging in client...")
+        await client.login(TOKEN)
+        await _sync_commands(client)
+
+        # Connect in the background so we can run some setup code once the client is ready
+        logger.info("Waiting for client to be ready...")
+        asyncio.create_task(client.connect())
+        await asyncio.wait_for(client.wait_until_ready(), CLIENT_WAIT_TIMEOUT)
+
+        logger.info("Starting Job Scheduler...")
+        scheduler.start()
+        logger.info("Client successfully started")
+
+        # Wait until task is cancelled
+        await asyncio.Event().wait()
+
+    finally:
+        logger.info("Client shutting down...")
+        scheduler.shutdown()
+        await client.close()
+        logger.info("Client successfully stopped")
 
 
 class _WordleTrackerClient(discord.Client):

@@ -92,6 +92,9 @@ class Summarizer:
 
             rank += 1
 
+        if len(summary.fields) == 0:
+            summary.add_field(name="\u200b\n", value="No games found in the current channel 😥")
+
         return summary
 
     async def get_daily_results(self, day: date) -> discord.Embed:
@@ -122,6 +125,9 @@ class Summarizer:
             )
 
             rank += 1
+
+        if len(results.fields) == 0:
+            results.add_field(name="\u200b\n", value="No games found in the current channel 😥")
 
         return results
 

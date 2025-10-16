@@ -28,22 +28,29 @@ logger = logging.getLogger(__name__)
 
 
 async def main() -> int:
-    shutdown_event = asyncio.Event()
+    run_client_task = asyncio.create_task(run_client())
 
     def handle_signal(signal: signal.Signals) -> None:
         logger.warning(f"Got {signal.name} signal, shuting down")
-        shutdown_event.set()
+        run_client_task.cancel()
 
-    loop = asyncio.get_running_loop()
-    for shutdown_signal in (signal.SIGTERM, signal.SIGINT):
-        loop.add_signal_handler(shutdown_signal, handle_signal, shutdown_signal)
+    # Signals only supported on unix type systems
+    try:
+        loop = asyncio.get_running_loop()
+        for shutdown_signal in (signal.SIGTERM, signal.SIGINT):
+            loop.add_signal_handler(shutdown_signal, handle_signal, shutdown_signal)
+    except Exception as ex:
+        logger.warning("Failed to register signal handlers (are you using windows?) %s", ex, exc_info=ex)
 
     try:
-        await run_client(shutdown_event)
-        return 0
+        await run_client_task
     except Exception as ex:
         logger.error("Error while running client: %s", ex, exc_info=ex)
         return 1
+    except asyncio.exceptions.CancelledError:
+        logger.info("Program shutdown due to cancellation request")
+
+    return 0
 
 
 if __name__ == "__main__":

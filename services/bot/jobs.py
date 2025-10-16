@@ -45,13 +45,12 @@ class JobScheduler:
             replace_existing=True,
         )
 
-    def start(self, shutdown_event: asyncio.Event) -> None:
-        async def shutdown() -> None:
-            await shutdown_event.wait()
-            self.scheduler.shutdown()
-
-        asyncio.create_task(shutdown())
+    def start(self) -> None:
         self.scheduler.start()
+
+    def shutdown(self) -> None:
+        if self.scheduler.running:
+            self.scheduler.shutdown()
 
 
 async def _scan_unseen_messages() -> None:

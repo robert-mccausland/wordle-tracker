@@ -8,7 +8,7 @@ FORWARDED_FIELDS = ["user_id", "guild_id", "channel_id", "name"]
 class JsonFormatter(logging.Formatter):
     def format(self, record: logging.LogRecord) -> str:
         log_record = {
-            "timestamp": datetime.now().isoformat(),
+            "timestamp": datetime.now().isoformat() + "Z",
             "level": record.levelname.lower(),
             "message": record.getMessage(),
         }
@@ -18,6 +18,6 @@ class JsonFormatter(logging.Formatter):
                 log_record[field] = getattr(record, field)
 
         if record.exc_info:
-            log_record["error"] = self.formatException(record.exc_info)
+            log_record["stack"] = self.formatException(record.exc_info)
 
         return json.dumps(log_record)
