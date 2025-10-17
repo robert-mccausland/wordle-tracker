@@ -3,47 +3,51 @@ import logging
 import discord
 
 from apps.core.models import WordleChannel, WordleGame
-from services.bot.config import CHANNEL_NAME, CLIENT_WAIT_TIMEOUT
+from services.bot.config import CLIENT_WAIT_TIMEOUT
 from services.bot.parser import LetterGuess, parse_message
 from django.utils import timezone
 
 logger = logging.getLogger(__name__)
 
 
+class ScannerError(Exception):
+    pass
+
+
 async def scan_unseen_messages(client: discord.Client) -> None:
     await asyncio.wait_for(client.wait_until_ready(), timeout=CLIENT_WAIT_TIMEOUT)
 
+    async def scan_channel(channel_id: int) -> None:
+        try:
+            channel = await client.fetch_channel(channel_id)
+            if channel is None:
+                raise ScannerError(f"Channel {channel_id} could not be found")
+            if not isinstance(channel, discord.TextChannel):
+                raise ScannerError(f"Expected channel {channel_id} to be a TextChannel, got {type(channel)}")
+
+            await _scan_unseen_messages_for_channel(channel)
+        except Exception as ex:
+            logger.error(
+                "Error while scanning messages for channel: %s",
+                ex,
+                exc_info=ex,
+                extra={"channel_id": channel_id},
+            )
+
     logger.info("Scanning previous messages")
-    try:
-        guilds = [guild async for guild in client.fetch_guilds()]
-        results = await asyncio.gather(
-            *[_scan_unseen_messages_for_guild(guild) for guild in guilds], return_exceptions=True
-        )
-
-        for result in results:
-            if result is None:
-                continue
-            logger.error("Error while scanning messages for guild: %s", result, exc_info=result)
-
-    except Exception as e:
-        logger.error("Error scanning previous messages: %s", e, exc_info=e)
+    channels = WordleChannel.objects.values("channel_id").aiterator()
+    await asyncio.gather(
+        *[scan_channel(channel["channel_id"]) async for channel in channels],
+    )
 
 
-async def _scan_unseen_messages_for_guild(guild: discord.Guild) -> None:
-    channels = await guild.fetch_channels()
-    for channel in channels:
-        if channel.name != CHANNEL_NAME:
-            continue
+async def _scan_unseen_messages_for_channel(channel: discord.TextChannel) -> None:
+    last_seen = None
+    wordle_channel = await WordleChannel.objects.filter(channel_id=channel.id).afirst()
+    if wordle_channel is not None and wordle_channel.last_seen_message is not None:
+        last_seen = discord.Object(id=wordle_channel.last_seen_message)
 
-        if not isinstance(channel, discord.TextChannel):
-            continue
-
-        last_seen = None
-        wordle_channel = await WordleChannel.objects.filter(channel_id=channel.id).afirst()
-        if wordle_channel is not None:
-            last_seen = discord.Object(id=wordle_channel.last_seen_message)
-
-        await scan_messages_for_channel(channel, last_seen)
+    await scan_messages_for_channel(channel, last_seen)
 
 
 async def scan_messages_for_channel(channel: discord.TextChannel, from_message_id: discord.Object | None) -> None:
@@ -106,7 +110,6 @@ async def process_message(message: discord.Message) -> None:
         message_id=message.id,
         defaults=dict(
             user_id=message.author.id,
-            guild_id=message.guild.id,
             channel_id=message.channel.id,
             posted_at=message.created_at,
             scanned_at=timezone.now(),

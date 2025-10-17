@@ -2,10 +2,11 @@ import asyncio
 import discord
 import logging
 
-from services.bot.commands import Admin, daily_summary, sodium, summary
+from apps.core.models import WordleChannel
+from services.bot.commands import Admin, daily_summary, summary
 from services.bot.config import CLIENT_WAIT_TIMEOUT, SYNC_COMMANDS, TOKEN
 from services.bot.jobs import JobScheduler
-from services.bot.scanner import CHANNEL_NAME, delete_message, process_message
+from services.bot.scanner import delete_message, process_message
 
 logger = logging.getLogger(__name__)
 
@@ -44,29 +45,29 @@ class _WordleTrackerClient(discord.Client):
     def __init__(self, *, intents: discord.Intents) -> None:
         super().__init__(intents=intents)
 
-    async def on_message(self, message: discord.Message) -> None:
+    async def _should_ignore_message(self, message: discord.Message) -> bool:
         if not isinstance(message.channel, discord.TextChannel):
-            return
+            return True
 
-        if message.channel.name != CHANNEL_NAME:
+        if not await WordleChannel.objects.filter(channel_id=message.channel.id).aexists():
+            return True
+
+        return False
+
+    async def on_message(self, message: discord.Message) -> None:
+        if await self._should_ignore_message(message):
             return
 
         await process_message(message)
 
     async def on_message_edit(self, before: discord.Message, after: discord.Message) -> None:
-        if not isinstance(after.channel, discord.TextChannel):
-            return
-
-        if after.channel.name != CHANNEL_NAME:
+        if await self._should_ignore_message(after):
             return
 
         await process_message(after)
 
     async def on_message_delete(self, message: discord.Message) -> None:
-        if not isinstance(message.channel, discord.TextChannel):
-            return
-
-        if message.channel.name != CHANNEL_NAME:
+        if await self._should_ignore_message(message):
             return
 
         await delete_message(message)
@@ -79,7 +80,6 @@ async def _sync_commands(client: discord.Client) -> None:
 
     logger.info("Syncing command definitions...")
     tree = discord.app_commands.CommandTree(client)
-    tree.add_command(sodium)
     tree.add_command(summary)
     tree.add_command(daily_summary)
     tree.add_command(Admin())

@@ -28,10 +28,7 @@ RANKING_FIELD_MAP = {
 
 
 class Summarizer:
-    def __init__(self, guild: discord.Guild, channel: discord.TextChannel) -> None:
-        assert channel.guild.id == guild.id
-
-        self.guild = guild
+    def __init__(self, channel: discord.TextChannel) -> None:
         self.channel = channel
 
     async def get_summary(
@@ -134,7 +131,7 @@ class Summarizer:
     async def _get_display_name(self, user_id: int) -> str:
         display_name: str
         try:
-            user = await self.guild.fetch_member(user_id)
+            user = await self.channel.guild.fetch_member(user_id)
             display_name = (
                 (user.display_name[: USERNAME_MAX_LENGTH - 1] + "…")
                 if len(user.display_name) > USERNAME_MAX_LENGTH
