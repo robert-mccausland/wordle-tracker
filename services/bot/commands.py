@@ -127,9 +127,9 @@ class Admin(discord.app_commands.Group):
 async def summary(
     interaction: discord.Interaction,
     days: int | None,
-    ranking: Ranking | None,
+    ranking: Ranking = Ranking.WINS,
     limit: int = SUMMARY_LIMIT_DEFAULT,
-    include_today: bool = True,
+    include_today: bool = False,
     response: ResponseType = ResponseType.Whisper,
 ) -> None:
     if not isinstance(interaction.channel, discord.TextChannel) or interaction.guild is None:
