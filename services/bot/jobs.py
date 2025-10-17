@@ -8,7 +8,7 @@ import logging
 import discord
 
 from apps.core.models import WordleChannel
-from services.bot.config import CLIENT_WAIT_TIMEOUT
+from services.bot.config import CLIENT_WAIT_TIMEOUT, TIMEZONE
 from services.bot.scanner import scan_unseen_messages
 from services.bot.summarizer import Summarizer
 from wordletracker.settings import DB_PATH
@@ -32,16 +32,20 @@ class JobScheduler:
         services = Services(client)
         path = DB_PATH / "scheduler.sqlite"
         jobstores = {"default": SQLAlchemyJobStore(url=f"sqlite:///{path}")}
-        self.scheduler = AsyncIOScheduler(jobstores=jobstores, event_loop=event_loop)
+        self.scheduler = AsyncIOScheduler(
+            jobstores=jobstores,
+            event_loop=event_loop,
+            timezone=TIMEZONE,
+        )
         self.scheduler.add_job(
             _daily_summary,
-            CronTrigger(hour=9, minute=0, second=0, timezone="Europe/London"),
+            CronTrigger(hour=9, minute=0, second=0),
             id="daily_summary",
             replace_existing=True,
         )
         self.scheduler.add_job(
             _scan_unseen_messages,
-            CronTrigger(minute="*/5", timezone="Europe/London"),
+            CronTrigger(minute="*/5"),
             id="scan_unseen_messages",
             replace_existing=True,
         )
