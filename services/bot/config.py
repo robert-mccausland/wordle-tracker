@@ -1,4 +1,5 @@
 import os
+from zoneinfo import ZoneInfo
 
 
 def _get_env(name: str, default: str | None = None) -> str:
@@ -35,6 +36,7 @@ def _get_env_bool(name: str, default: bool) -> bool:
 
 TOKEN = _get_env("TOKEN")
 SUMMARY_LIMIT_DEFAULT = _get_env_int("SUMMARY_LIMIT_DEFAULT", 5)
-USERNAME_MAX_LENGTH = _get_env_int("USERNAME_MAX_LENGTH", 12)
+USERNAME_MAX_LENGTH = _get_env_int("USERNAME_MAX_LENGTH", 20)
 CLIENT_WAIT_TIMEOUT = _get_env_int("CLIENT_WAIT_TIMEOUT", 60)
 SYNC_COMMANDS = _get_env_bool("SYNC_COMMANDS", True)
+TIMEZONE = ZoneInfo(_get_env("TIMEZONE", "Europe/London"))

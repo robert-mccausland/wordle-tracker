@@ -1,11 +1,11 @@
-from datetime import date, timedelta
+from datetime import datetime, timedelta
 import enum
 import logging
 import discord
 from django.db import IntegrityError
 
 from apps.core.models import WordleChannel
-from services.bot.config import SUMMARY_LIMIT_DEFAULT
+from services.bot.config import SUMMARY_LIMIT_DEFAULT, TIMEZONE
 from services.bot.scanner import scan_messages_for_channel
 from services.bot.summarizer import Ranking, Summarizer
 
@@ -19,7 +19,11 @@ CHANNEL_NOT_ADDED = (
     "Wordle Tracker has not yet been added to this channel. "
     "Run the `/admin add` command to add the bot to this channel"
 )
-GENERIC_ERROR = "Oopsie woopsie! Something went wrong while processing your command (*^ω^*)~"
+GENERIC_ERROR = (
+    "Oopsie woopsie! Something went wrong while processing your command (*^ω^*)~\n"
+    "For assistance please contact [support](https://bitly.com/98K8eH) to see if they "
+    "will grace you with any wisdom upon this matter"
+)
 
 
 class ResponseType(enum.Enum):
@@ -53,8 +57,10 @@ class Admin(discord.app_commands.Group):
         try:
             await scan_messages_for_channel(interaction.channel, None)
             content = CHANNEL_ADDED_SUCCESS
+        except Exception as ex:
+            logger.error("Error when adding channel: %s", ex, exc_info=ex)
         finally:
-            await interaction.edit_original_response(content=content)
+            await interaction.followup.send(content=content, suppress_embeds=True)
 
     @discord.app_commands.command(name="info", description="Show current channel info")
     async def info(self, interaction: discord.Interaction) -> None:
@@ -73,7 +79,7 @@ class Admin(discord.app_commands.Group):
                 )
             await interaction.response.send_message(content=content, ephemeral=True)
         except Exception as ex:
-            await interaction.response.send_message(content=GENERIC_ERROR, ephemeral=True)
+            await interaction.response.send_message(content=GENERIC_ERROR, ephemeral=True, suppress_embeds=True)
             logger.error("Error getting channel info: %s", ex, exc_info=ex)
 
     @discord.app_commands.command(name="remove", description="Remove current channel from the Wordle Tracker")
@@ -92,7 +98,7 @@ class Admin(discord.app_commands.Group):
     @discord.app_commands.command(name="rescan", description="Rescan all the messages in current channel")
     async def rescan(self, interaction: discord.Interaction) -> None:
         if not isinstance(interaction.channel, discord.TextChannel) or interaction.guild is None:
-            await interaction.response.send_message(content=GENERIC_ERROR, ephemeral=True)
+            await interaction.response.send_message(content=GENERIC_ERROR, ephemeral=True, suppress_embeds=True)
             return
 
         if not await WordleChannel.objects.filter(channel_id=interaction.channel.id).aexists():
@@ -100,39 +106,52 @@ class Admin(discord.app_commands.Group):
             return
 
         await interaction.response.defer(ephemeral=True)
+        content = GENERIC_ERROR
         try:
             await scan_messages_for_channel(interaction.channel, None)
-            await interaction.edit_original_response(content="Rescanning finished!")
+            content = "Rescanning finished!"
         except Exception as ex:
-            await interaction.edit_original_response(content=GENERIC_ERROR)
             logger.error("Error rescanning messages: %s", ex, exc_info=ex)
+        finally:
+            await interaction.followup.send(content, suppress_embeds=True)
 
 
 @discord.app_commands.command(name="wordle-summary", description="Summary of wordle games posted in current channel")
-@discord.app_commands.describe(days="Number of days to limit the summary to")
-@discord.app_commands.describe(limit="Max number of autists to include")
-@discord.app_commands.describe(ranking="How to rank the autists")
-@discord.app_commands.describe(response="Which format to respond to the request in")
+@discord.app_commands.describe(
+    days="Number of previous days to limit the summary to",
+    include_today="Should today's results be included",
+    limit="Max number of autists to include",
+    ranking="How to rank the autists",
+    response="Which format to respond to the request in",
+)
 async def summary(
     interaction: discord.Interaction,
     days: int | None,
     ranking: Ranking | None,
     limit: int = SUMMARY_LIMIT_DEFAULT,
+    include_today: bool = True,
     response: ResponseType = ResponseType.Whisper,
 ) -> None:
     if not isinstance(interaction.channel, discord.TextChannel) or interaction.guild is None:
-        await interaction.response.send_message(content=GENERIC_ERROR, ephemeral=True)
+        await interaction.response.send_message(content=GENERIC_ERROR, ephemeral=True, suppress_embeds=True)
         return
 
     if not await WordleChannel.objects.filter(channel_id=interaction.channel.id).aexists():
         await interaction.response.send_message(content=CHANNEL_NOT_ADDED, ephemeral=True)
         return
+    try:
+        summarizer = Summarizer(interaction.channel)
+        end_date = datetime.now().astimezone(TIMEZONE).date()
+        if include_today:
+            end_date += timedelta(days=1)
 
-    summarizer = Summarizer(interaction.channel)
-    embed = await summarizer.get_summary(limit, date.today(), ranking, days)
-    await interaction.response.send_message(
-        embed=embed, ephemeral=response == ResponseType.Whisper, silent=response == ResponseType.Post
-    )
+        embed = await summarizer.get_summary(limit, end_date, ranking, days)
+        await interaction.response.send_message(
+            embed=embed, ephemeral=response == ResponseType.Whisper, silent=response == ResponseType.Post
+        )
+    except Exception as ex:
+        await interaction.response.send_message(content=GENERIC_ERROR, ephemeral=True, suppress_embeds=True)
+        logger.error("Error generating summary: %s", ex, exc_info=ex)
 
 
 @discord.app_commands.command(name="wordle-results", description="Results of yesterdays wordle game")
@@ -142,16 +161,20 @@ async def daily_summary(
     response: ResponseType = ResponseType.Whisper,
 ) -> None:
     if not isinstance(interaction.channel, discord.TextChannel) or interaction.guild is None:
-        await interaction.response.send_message(content=GENERIC_ERROR, ephemeral=True)
+        await interaction.response.send_message(content=GENERIC_ERROR, ephemeral=True, suppress_embeds=True)
         return
 
     if not await WordleChannel.objects.filter(channel_id=interaction.channel.id).aexists():
         await interaction.response.send_message(content=CHANNEL_NOT_ADDED, ephemeral=True)
         return
 
-    summarizer = Summarizer(interaction.channel)
-    yesterday = date.today() - timedelta(days=1)
-    embed = await summarizer.get_daily_results(yesterday)
-    await interaction.response.send_message(
-        embed=embed, ephemeral=response == ResponseType.Whisper, silent=response == ResponseType.Post
-    )
+    try:
+        summarizer = Summarizer(interaction.channel)
+        yesterday = datetime.now().astimezone(TIMEZONE).date() - timedelta(days=1)
+        embed = await summarizer.get_daily_results(yesterday)
+        await interaction.response.send_message(
+            embed=embed, ephemeral=response == ResponseType.Whisper, silent=response == ResponseType.Post
+        )
+    except Exception as ex:
+        await interaction.response.send_message(content=GENERIC_ERROR, ephemeral=True, suppress_embeds=True)
+        logger.error("Error getting daily results: %s", ex, exc_info=ex)

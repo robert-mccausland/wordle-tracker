@@ -1,11 +1,13 @@
 import asyncio
+from datetime import datetime, time, timezone
 import logging
 import discord
 
 from apps.core.models import WordleChannel, WordleGame
-from services.bot.config import CLIENT_WAIT_TIMEOUT
+from services.bot.config import CLIENT_WAIT_TIMEOUT, TIMEZONE
 from services.bot.parser import LetterGuess, parse_message
-from django.utils import timezone
+
+from services.bot.utils import wordle_number_for_day
 
 logger = logging.getLogger(__name__)
 
@@ -53,7 +55,7 @@ async def _scan_unseen_messages_for_channel(channel: discord.TextChannel) -> Non
 async def scan_messages_for_channel(channel: discord.TextChannel, from_message_id: discord.Object | None) -> None:
     new_last_seen = None
 
-    scan_started_at = timezone.now()
+    scan_started_at = datetime.now(timezone.utc)
     try:
         async for message in channel.history(limit=None, after=from_message_id, oldest_first=True):
             await process_message(message)
@@ -99,12 +101,16 @@ async def process_message(message: discord.Message) -> None:
     if result is None:
         return
 
+    date = message.created_at.astimezone(TIMEZONE).date()
+    day_start = datetime.combine(date, time.min, tzinfo=TIMEZONE)
     is_duplicate = await WordleGame.objects.filter(
         game_number=result.game_number,
         user_id=message.author.id,
         channel_id=message.channel.id,
         message_id__lt=message.id,
+        posted_at__gte=day_start,
     ).aexists()
+    is_correct_day = wordle_number_for_day(date) == result.game_number
 
     await WordleGame.objects.aupdate_or_create(
         message_id=message.id,
@@ -112,9 +118,10 @@ async def process_message(message: discord.Message) -> None:
             user_id=message.author.id,
             channel_id=message.channel.id,
             posted_at=message.created_at,
-            scanned_at=timezone.now(),
+            scanned_at=datetime.now(timezone.utc),
             game_number=result.game_number,
             is_duplicate=is_duplicate,
+            is_correct_day=is_correct_day,
             is_win=result.is_win,
             is_hard_mode=result.is_hard_mode,
             guesses=len(result.guesses),

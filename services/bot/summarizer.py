@@ -5,11 +5,11 @@ from apps.core.models import WordleGame
 import enum
 
 from services.bot.config import USERNAME_MAX_LENGTH
+from services.bot.utils import wordle_number_for_day
 
 
 DEFAULT_RANKING = ["-wins", "-games", "average", "best"]
 RANK_EMOJIS = {1: "🥇", 2: "🥈", 3: "🥉"}
-WORDLE_EPOCH = date(2021, 6, 19)
 
 
 class Ranking(enum.Enum):
@@ -27,6 +27,10 @@ RANKING_FIELD_MAP = {
 }
 
 
+class SummarizerError(Exception):
+    pass
+
+
 class Summarizer:
     def __init__(self, channel: discord.TextChannel) -> None:
         self.channel = channel
@@ -39,9 +43,12 @@ class Summarizer:
         days: int | None,
     ) -> discord.Embed:
 
-        max_game_number = _wordle_number_for_day(end)
+        max_game_number = wordle_number_for_day(end) or 0
         games = WordleGame.objects.filter(
-            channel_id=self.channel.id, is_duplicate=False, game_number__lt=max_game_number
+            channel_id=self.channel.id,
+            is_duplicate=False,
+            is_correct_day=True,
+            game_number__lt=max_game_number,
         )
 
         if days is not None:
@@ -95,15 +102,20 @@ class Summarizer:
         return summary
 
     async def get_daily_results(self, day: date) -> discord.Embed:
-        game_number = _wordle_number_for_day(day)
-        games = WordleGame.objects.filter(
-            channel_id=self.channel.id, is_duplicate=False, game_number=game_number
-        ).order_by("guesses", "-is_win")
+        game_number = wordle_number_for_day(day)
+        if game_number is None:
+            raise SummarizerError(f"Could not generate results, there was no wordle game on {day}")
 
         rank = 1
         title = f"🏆 Game {game_number} Results 🏆"
         results = discord.Embed(title=title, color=0x00FF00)
         results.set_author(name="Wordle Tracker")
+        games = WordleGame.objects.filter(
+            channel_id=self.channel.id,
+            is_duplicate=False,
+            is_correct_day=True,
+            game_number=game_number,
+        ).order_by("guesses", "-is_win", "posted_at")
 
         async for row in games.aiterator():
             display_name = await self._get_display_name(row.user_id)
@@ -141,10 +153,6 @@ class Summarizer:
             display_name = "Unknown User"
 
         return display_name
-
-
-def _wordle_number_for_day(day: date) -> int:
-    return (day - WORDLE_EPOCH).days
 
 
 def _get_rank_symbol(rank: int) -> str:
