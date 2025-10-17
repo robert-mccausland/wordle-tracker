@@ -62,17 +62,19 @@ class Admin(discord.app_commands.Group):
             await interaction.response.send_message(content=GENERIC_ERROR, ephemeral=True)
             return
 
-        channel = await WordleChannel.objects.aget(channel_id=interaction.channel.id)
-        if channel is None:
-            await interaction.response.send_message(content=CHANNEL_NOT_ADDED, ephemeral=True)
-            return
-
-        info = (
-            "Wordle Tracker has been added to this channel!\n"
-            f"Daily Summary Enabled: {channel.daily_summary_enabled}\n"
-        )
-
-        await interaction.response.send_message(content=info)
+        try:
+            channel = await WordleChannel.objects.filter(channel_id=interaction.channel.id).afirst()
+            if channel is None:
+                content = CHANNEL_NOT_ADDED
+            else:
+                content = (
+                    "Wordle Tracker has been added to this channel!\n"
+                    f"Daily Summary Enabled: {channel.daily_summary_enabled}\n"
+                )
+            await interaction.response.send_message(content=content, ephemeral=True)
+        except Exception as ex:
+            await interaction.response.send_message(content=GENERIC_ERROR, ephemeral=True)
+            logger.error("Error getting channel info: %s", ex, exc_info=ex)
 
     @discord.app_commands.command(name="remove", description="Remove current channel from the Wordle Tracker")
     async def remove(self, interaction: discord.Interaction) -> None:
