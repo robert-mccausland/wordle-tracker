@@ -3,7 +3,7 @@ from django.db import models
 
 class WordleChannel(models.Model):
     channel_id = models.BigIntegerField(primary_key=True)
-    guild_id = models.BigIntegerField(null=True)
+    guild_id = models.BigIntegerField()
     last_seen_message = models.BigIntegerField(null=True)
     daily_summary_enabled = models.BooleanField()
 
@@ -11,7 +11,6 @@ class WordleChannel(models.Model):
 class WordleGame(models.Model):
     message_id = models.BigIntegerField(primary_key=True)
     channel = models.ForeignKey(WordleChannel, on_delete=models.CASCADE)
-    guild_id = (models.BigIntegerField(null=True),)
     user_id = models.BigIntegerField()
     posted_at = models.DateTimeField()
     scanned_at = models.DateTimeField()

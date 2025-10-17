@@ -38,13 +38,10 @@ class Admin(discord.app_commands.Group):
             return
 
         try:
-            # To fix old data we here, will be changed to an update once all old channels are updated
-            await WordleChannel.objects.aupdate_or_create(
+            await WordleChannel.objects.acreate(
                 channel_id=interaction.channel.id,
-                defaults={
-                    "guild_id": interaction.channel.guild.id,
-                    "daily_summary_enabled": True,
-                },
+                guild_id=interaction.channel.guild.id,
+                daily_summary_enabled=True,
             )
         except IntegrityError:
             await interaction.response.send_message(content=CHANNEL_ALREADY_ADDED, ephemeral=True)
