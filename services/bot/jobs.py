@@ -7,7 +7,8 @@ from apscheduler.triggers.cron import CronTrigger
 import logging
 import discord
 
-from services.bot.config import CHANNEL_NAME, CLIENT_WAIT_TIMEOUT
+from apps.core.models import WordleChannel
+from services.bot.config import CLIENT_WAIT_TIMEOUT
 from services.bot.scanner import scan_unseen_messages
 from services.bot.summarizer import Summarizer
 from wordletracker.settings import DB_PATH
@@ -64,24 +65,24 @@ async def _daily_summary() -> None:
 
     await asyncio.wait_for(services.client.wait_until_ready(), timeout=CLIENT_WAIT_TIMEOUT)
     yesterday = date.today() - timedelta(days=1)
-    async for guild in services.client.fetch_guilds():
-        for channel in await guild.fetch_channels():
-            if not isinstance(channel, discord.TextChannel):
-                continue
+    async for wordle_channel in WordleChannel.objects.aiterator():
+        if not wordle_channel.daily_summary_enabled:
+            continue
 
-            if channel.name != CHANNEL_NAME:
-                continue
+        channel = await services.client.fetch_channel(wordle_channel.channel_id)
+        if not isinstance(channel, discord.TextChannel):
+            continue
 
-            try:
-                summarizer = Summarizer(guild, channel)
-                results = await summarizer.get_daily_results(yesterday)
-                await channel.send(embed=results)
-            except Exception as ex:
-                logger.error(
-                    "Unable to post daily summary to channel: %s",
-                    ex,
-                    exc_info=ex,
-                    extra={"guild_id": guild.id, "channel_id": channel.id},
-                )
+        try:
+            summarizer = Summarizer(channel)
+            results = await summarizer.get_daily_results(yesterday)
+            await channel.send(embed=results)
+        except Exception as ex:
+            logger.error(
+                "Unable to post daily summary to channel: %s",
+                ex,
+                exc_info=ex,
+                extra={"guild_id": channel.guild.id, "channel_id": channel.id},
+            )
 
     logger.info("Daily summary finished")
