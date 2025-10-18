@@ -22,17 +22,17 @@ logging.basicConfig(level=logging.INFO, handlers=[handler])
 django.setup()
 
 # The above code needs to be ran before the rest of the app is imported
-from services.bot.client import run_client  # noqa: E402
+from services.bot.startup import startup  # noqa: E402
 
 logger = logging.getLogger(__name__)
 
 
 async def main() -> int:
-    run_client_task = asyncio.create_task(run_client())
+    startup_task = asyncio.create_task(startup())
 
     def handle_signal(signal: signal.Signals) -> None:
-        logger.warning(f"Got {signal.name} signal, shuting down")
-        run_client_task.cancel()
+        logger.info(f"Got {signal.name} signal, sending cancellation request")
+        startup_task.cancel()
 
     # Signals only supported on unix type systems
     try:
@@ -43,12 +43,12 @@ async def main() -> int:
         logger.warning("Failed to register signal handlers (are you using windows?) %s", ex, exc_info=ex)
 
     try:
-        await run_client_task
+        await startup_task
     except Exception as ex:
-        logger.error("Error while running client: %s", ex, exc_info=ex)
+        logger.error("Error while running app: %s", ex, exc_info=ex)
         return 1
     except asyncio.exceptions.CancelledError:
-        logger.info("Program shutdown due to cancellation request")
+        logger.warning("App shutdown due to cancellation request")
 
     return 0
 

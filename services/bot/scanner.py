@@ -19,37 +19,35 @@ class ScannerError(Exception):
 async def scan_unseen_messages(client: discord.Client) -> None:
     await asyncio.wait_for(client.wait_until_ready(), timeout=CLIENT_WAIT_TIMEOUT)
 
-    async def scan_channel(channel_id: int) -> None:
+    async def scan_channel(wordle_channel: WordleChannel) -> None:
         try:
-            channel = await client.fetch_channel(channel_id)
+            channel = await client.fetch_channel(wordle_channel.channel_id)
             if channel is None:
-                raise ScannerError(f"Channel {channel_id} could not be found")
+                raise ScannerError(f"Channel {wordle_channel.channel_id} could not be found")
             if not isinstance(channel, discord.TextChannel):
-                raise ScannerError(f"Expected channel {channel_id} to be a TextChannel, got {type(channel)}")
+                raise ScannerError(
+                    f"Expected channel {wordle_channel.channel_id} to be a TextChannel, got {type(channel)}"
+                )
 
-            await _scan_unseen_messages_for_channel(channel)
+            last_seen = None
+            if wordle_channel.last_seen_message is not None:
+                last_seen = discord.Object(id=wordle_channel.last_seen_message)
+
+            await scan_messages_for_channel(channel, last_seen)
+
         except Exception as ex:
             logger.error(
                 "Error while scanning messages for channel: %s",
                 ex,
                 exc_info=ex,
-                extra={"channel_id": channel_id},
+                extra={"channel_id": wordle_channel.channel_id},
             )
 
     logger.info("Scanning previous messages")
-    channels = WordleChannel.objects.values("channel_id").aiterator()
+    channels = WordleChannel.objects.aiterator()
     await asyncio.gather(
-        *[scan_channel(channel["channel_id"]) async for channel in channels],
+        *[scan_channel(channel) async for channel in channels],
     )
-
-
-async def _scan_unseen_messages_for_channel(channel: discord.TextChannel) -> None:
-    last_seen = None
-    wordle_channel = await WordleChannel.objects.filter(channel_id=channel.id).afirst()
-    if wordle_channel is not None and wordle_channel.last_seen_message is not None:
-        last_seen = discord.Object(id=wordle_channel.last_seen_message)
-
-    await scan_messages_for_channel(channel, last_seen)
 
 
 async def scan_messages_for_channel(channel: discord.TextChannel, from_message_id: discord.Object | None) -> None:
@@ -62,7 +60,9 @@ async def scan_messages_for_channel(channel: discord.TextChannel, from_message_i
             new_last_seen = message
     finally:
         if new_last_seen is not None:
-            await _update_last_seen_message(new_last_seen)
+            await WordleChannel.objects.filter(channel_id=message.channel.id).aupdate(
+                last_seen_message=new_last_seen.id
+            )
 
     if new_last_seen is None:
         return
@@ -132,14 +132,3 @@ async def process_message(message: discord.Message) -> None:
 
 async def delete_message(message: discord.Message) -> None:
     await WordleGame.objects.filter(message_id=message.id).adelete()
-
-
-async def _update_last_seen_message(message: discord.Message) -> None:
-    channel, created = await WordleChannel.objects.aget_or_create(
-        channel_id=message.channel.id, defaults={"last_seen_message": message.id}
-    )
-
-    if not created:
-        await WordleChannel.objects.filter(channel_id=channel.channel_id, last_seen_message__lt=message.id).aupdate(
-            last_seen_message=message.id
-        )
