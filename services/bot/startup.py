@@ -5,10 +5,10 @@ from services.bot.config import SYNC_COMMANDS, TIMEZONE
 logger = logging.getLogger(__name__)
 
 
-async def startup() -> None:
+async def run() -> None:
     logger.info(
         f"Application bootstrapped with the following settings:\nTIMEZONE={TIMEZONE}\nSYNC_COMMANDS={SYNC_COMMANDS}"
     )
 
-    logger.info("Application starting up...")
+    logger.info("Client starting up...")
     await run_client()

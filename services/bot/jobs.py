@@ -39,13 +39,13 @@ class JobScheduler:
         )
         self.scheduler.add_job(
             _daily_summary,
-            CronTrigger(hour=9, minute=0, second=0),
+            CronTrigger(hour=9, minute=0, second=0, timezone=TIMEZONE),
             id="daily_summary",
             replace_existing=True,
         )
         self.scheduler.add_job(
             _scan_unseen_messages,
-            CronTrigger(minute="*/5"),
+            CronTrigger(minute="*/5", timezone=TIMEZONE),
             id="scan_unseen_messages",
             replace_existing=True,
         )
