@@ -127,7 +127,7 @@ class Admin(discord.app_commands.Group):
 async def summary(
     interaction: discord.Interaction,
     days: int | None,
-    ranking: Ranking = Ranking.WINS,
+    ranking: Ranking,
     limit: int = SUMMARY_LIMIT_DEFAULT,
     include_today: bool = False,
     response: ResponseType = ResponseType.Whisper,
