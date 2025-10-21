@@ -23,7 +23,7 @@ RANKING_FIELD_MAP = {
     Ranking.BEST: "best",
     Ranking.WINS: "-wins",
     Ranking.AVERAGE: "average",
-    Ranking.GAMES: "games",
+    Ranking.GAMES: "-games",
 }
 
 
@@ -39,7 +39,7 @@ class Summarizer:
         self,
         limit: int,
         end: date,
-        ranking: Ranking | None,
+        ranking: Ranking,
         days: int | None,
     ) -> discord.Embed:
 
@@ -56,9 +56,8 @@ class Summarizer:
             games = games.filter(game_number__gte=min_game_number)
 
         order = DEFAULT_RANKING
-        if ranking is not None:
-            ranking_field = RANKING_FIELD_MAP[ranking]
-            order = [ranking_field] + [x for x in order if x != ranking_field]
+        ranking_field = RANKING_FIELD_MAP[ranking]
+        order = [ranking_field] + [x for x in order if x != ranking_field]
 
         data = (
             games.values("user_id")
