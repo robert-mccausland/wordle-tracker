@@ -8,6 +8,7 @@ from apps.core.models import WordleChannel
 from services.bot.config import SUMMARY_LIMIT_DEFAULT, TIMEZONE
 from services.bot.scanner import scan_messages_for_channel
 from services.bot.summarizer import Ranking, Summarizer
+from services.bot.utils import game_number_for_day
 
 logger = logging.getLogger(__name__)
 
@@ -154,10 +155,12 @@ async def summary(
         logger.error("Error generating summary: %s", ex, exc_info=ex)
 
 
-@discord.app_commands.command(name="wordle-results", description="Results of yesterdays wordle game")
+@discord.app_commands.command(name="wordle-results", description="Results of a wordle game")
+@discord.app_commands.describe(response="Which Wordle Game to get the results for, defaults to yesterday")
 @discord.app_commands.describe(response="Which format to respond to the request in")
 async def daily_summary(
     interaction: discord.Interaction,
+    game_number: int | None,
     response: ResponseType = ResponseType.Whisper,
 ) -> None:
     if not isinstance(interaction.channel, discord.TextChannel) or interaction.guild is None:
@@ -169,9 +172,16 @@ async def daily_summary(
         return
 
     try:
+        if game_number is None:
+            yesterday = datetime.now().astimezone(TIMEZONE).date() - timedelta(days=1)
+            game_number = game_number_for_day(yesterday)
+            if game_number is None:
+                await interaction.response.send_message(content=GENERIC_ERROR, ephemeral=True, suppress_embeds=True)
+                logger.error(f"Failed to get game number for yesterday: {yesterday}")
+                return
+
         summarizer = Summarizer(interaction.channel)
-        yesterday = datetime.now().astimezone(TIMEZONE).date() - timedelta(days=1)
-        embed = await summarizer.get_daily_results(yesterday)
+        embed = await summarizer.get_daily_results(game_number)
         await interaction.response.send_message(
             embed=embed, ephemeral=response == ResponseType.Whisper, silent=response == ResponseType.Post
         )
