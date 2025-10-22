@@ -11,6 +11,7 @@ from apps.core.models import WordleChannel
 from services.bot.config import CLIENT_WAIT_TIMEOUT, TIMEZONE
 from services.bot.scanner import scan_unseen_messages
 from services.bot.summarizer import Summarizer
+from services.bot.utils import game_number_for_day
 from wordletracker.settings import DB_PATH
 
 logger = logging.getLogger(__name__)
@@ -79,7 +80,12 @@ async def _daily_summary() -> None:
 
         try:
             summarizer = Summarizer(channel)
-            results = await summarizer.get_daily_results(yesterday)
+            game_number = game_number_for_day(yesterday)
+            if game_number is None:
+                raise ValueError(f"Failed to get game number for yesterday: {yesterday}")
+                return
+
+            results = await summarizer.get_daily_results(game_number)
             await channel.send(embed=results)
         except Exception as ex:
             logger.error(
