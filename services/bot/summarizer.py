@@ -5,7 +5,7 @@ from apps.core.models import WordleGame
 import enum
 
 from services.bot.config import USERNAME_MAX_LENGTH
-from services.bot.utils import wordle_number_for_day
+from services.bot.utils import game_number_for_day
 
 
 DEFAULT_RANKING = ["-wins", "-games", "average", "best"]
@@ -43,7 +43,7 @@ class Summarizer:
         days: int | None,
     ) -> discord.Embed:
 
-        max_game_number = wordle_number_for_day(end) or 0
+        max_game_number = game_number_for_day(end) or 0
         games = WordleGame.objects.filter(
             channel_id=self.channel.id,
             is_duplicate=False,
@@ -100,11 +100,7 @@ class Summarizer:
 
         return summary
 
-    async def get_daily_results(self, day: date) -> discord.Embed:
-        game_number = wordle_number_for_day(day)
-        if game_number is None:
-            raise SummarizerError(f"Could not generate results, there was no wordle game on {day}")
-
+    async def get_daily_results(self, game_number: int) -> discord.Embed:
         rank = 1
         title = f"🏆 Game {game_number} Results 🏆"
         results = discord.Embed(title=title, color=0x00FF00)

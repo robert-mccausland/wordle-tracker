@@ -7,7 +7,7 @@ from apps.core.models import WordleChannel, WordleGame
 from services.bot.config import CLIENT_WAIT_TIMEOUT, TIMEZONE
 from services.bot.parser import LetterGuess, parse_message
 
-from services.bot.utils import wordle_number_for_day
+from services.bot.utils import game_number_for_day
 
 logger = logging.getLogger(__name__)
 
@@ -110,7 +110,7 @@ async def process_message(message: discord.Message) -> None:
         message_id__lt=message.id,
         posted_at__gte=day_start,
     ).aexists()
-    is_correct_day = wordle_number_for_day(date) == result.game_number
+    is_correct_day = game_number_for_day(date) == result.game_number
 
     await WordleGame.objects.aupdate_or_create(
         message_id=message.id,
