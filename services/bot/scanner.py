@@ -53,7 +53,6 @@ async def scan_unseen_messages(client: discord.Client) -> None:
 async def scan_messages_for_channel(channel: discord.TextChannel, from_message_id: discord.Object | None) -> None:
     new_last_seen = None
 
-    scan_started_at = datetime.now(timezone.utc)
     try:
         async for message in channel.history(limit=None, after=from_message_id, oldest_first=True):
             await process_message(message)
@@ -67,20 +66,21 @@ async def scan_messages_for_channel(channel: discord.TextChannel, from_message_i
     if new_last_seen is None:
         return
 
+    # TODO - fix this logic which kept removing games that it shouldn't
     # Remove games which we did not just scan and are in the interval
-    filters = {
-        "scanned_at__lt": scan_started_at,
-        "message_id__lte": new_last_seen.id,
-    }
+    # filters = {
+    #     "scanned_at__lt": scan_started_at,
+    #     "message_id__lte": new_last_seen.id,
+    # }
 
-    if from_message_id is not None:
-        filters["message_id__gt"] = from_message_id.id
+    # if from_message_id is not None:
+    #     filters["message_id__gt"] = from_message_id.id
 
-    deleted_count, _ = await WordleGame.objects.filter(**filters).adelete()
-    if deleted_count > 0:
-        logger.info(
-            f"Deleted {deleted_count} games which are no longer in the channel", extra={"channel_id": channel.id}
-        )
+    # deleted_count, _ = await WordleGame.objects.filter(**filters).adelete()
+    # if deleted_count > 0:
+    #     logger.info(
+    #         f"Deleted {deleted_count} games which are no longer in the channel", extra={"channel_id": channel.id}
+    #     )
 
 
 def _map_guess(guess: list[LetterGuess]) -> int:
