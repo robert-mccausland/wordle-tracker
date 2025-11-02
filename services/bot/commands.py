@@ -47,6 +47,7 @@ class Admin(discord.app_commands.Group):
                 channel_id=interaction.channel.id,
                 guild_id=interaction.channel.guild.id,
                 daily_summary_enabled=True,
+                daily_reminder_enabled=True,
             )
         except IntegrityError:
             await interaction.response.send_message(content=CHANNEL_ALREADY_ADDED, ephemeral=True)

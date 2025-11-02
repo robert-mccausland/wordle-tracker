@@ -6,6 +6,7 @@ class WordleChannel(models.Model):
     guild_id = models.BigIntegerField()
     last_seen_message = models.BigIntegerField(null=True)
     daily_summary_enabled = models.BooleanField()
+    daily_reminder_enabled = models.BooleanField()
 
 
 class WordleGame(models.Model):
