@@ -1,13 +1,13 @@
 from datetime import date
 import discord
-from django.db.models import Count, Avg, Min, Q
+from django.db.models import Count, Avg, Min, Q, Max
 from apps.core.models import WordleGame
 import enum
 
 from services.bot.config import USERNAME_MAX_LENGTH
 from services.bot.utils import game_number_for_day
 
-
+REMINDER_MAX_DAYS = 3
 DEFAULT_RANKING = ["-wins", "-games", "average", "best"]
 RANK_EMOJIS = {1: "🥇", 2: "🥈", 3: "🥉"}
 
@@ -79,7 +79,6 @@ class Summarizer:
             title += f" | ranked by {ranking.value}"
 
         summary = discord.Embed(title=title, color=0x00FF00)
-        summary.set_author(name="Wordle Tracker")
         async for row in data.aiterator():
             display_name = await self._get_display_name(row["user_id"])
             rank_symbol = _get_rank_symbol(rank)
@@ -104,7 +103,6 @@ class Summarizer:
         rank = 1
         title = f"🏆 Game {game_number} Results 🏆"
         results = discord.Embed(title=title, color=0x00FF00)
-        results.set_author(name="Wordle Tracker")
         games = WordleGame.objects.filter(
             channel_id=self.channel.id,
             is_duplicate=False,
@@ -134,6 +132,41 @@ class Summarizer:
             results.add_field(name="\u200b\n", value="No games found in the current channel 😥")
 
         return results
+
+    async def get_daily_reminder(self, game_number: int) -> discord.Embed | None:
+
+        last_played = (
+            WordleGame.objects.filter(
+                channel_id=self.channel.id,
+                is_duplicate=False,
+                is_correct_day=True,
+                game_number__gte=game_number - REMINDER_MAX_DAYS,
+                game_number__lte=game_number,
+            )
+            .values("user_id")
+            .annotate(last_played=Max("game_number"))
+            .aiterator()
+        )
+
+        title = "⏰ Reminder ⏰\n\u200b\nSome regulars have not played a game today!"
+        reminder = discord.Embed(title=title, color=0xFFFF00)
+        async for row in last_played:
+            days_missing = game_number - row["last_played"]
+            if days_missing > 0:
+                user_id = row["user_id"]
+                display_name = await self._get_display_name(user_id)
+                days_display = f"{days_missing} " + ("day" if days_missing == 1 else "days")
+                row_summary = f"<@{user_id}> last played {days_display} ago"
+                reminder.add_field(
+                    name=f"\u200b\n{display_name}",
+                    value=row_summary,
+                    inline=False,
+                )
+
+        if len(reminder.fields) == 0:
+            return None
+
+        return reminder
 
     async def _get_display_name(self, user_id: int) -> str:
         display_name: str

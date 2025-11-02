@@ -1,6 +1,6 @@
 from asyncio import AbstractEventLoop
 import asyncio
-from datetime import date, timedelta
+from datetime import datetime, timedelta
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.jobstores.sqlalchemy import SQLAlchemyJobStore
 from apscheduler.triggers.cron import CronTrigger
@@ -45,6 +45,12 @@ class JobScheduler:
             replace_existing=True,
         )
         self.scheduler.add_job(
+            _daily_reminder,
+            CronTrigger(hour=21, minute=0, second=0, timezone=TIMEZONE),
+            id="daily_reminder",
+            replace_existing=True,
+        )
+        self.scheduler.add_job(
             _scan_unseen_messages,
             CronTrigger(minute="*/5", timezone=TIMEZONE),
             id="scan_unseen_messages",
@@ -69,7 +75,12 @@ async def _daily_summary() -> None:
     logger.info("Daily summary running")
 
     await asyncio.wait_for(services.client.wait_until_ready(), timeout=CLIENT_WAIT_TIMEOUT)
-    yesterday = date.today() - timedelta(days=1)
+    yesterday = datetime.now(TIMEZONE).today().date() - timedelta(days=1)
+    game_number = game_number_for_day(yesterday)
+    if game_number is None:
+        logger.error(f"Failed to get game number for yesterday: {yesterday}")
+        return
+
     async for wordle_channel in WordleChannel.objects.aiterator():
         if not wordle_channel.daily_summary_enabled:
             continue
@@ -80,10 +91,6 @@ async def _daily_summary() -> None:
 
         try:
             summarizer = Summarizer(channel)
-            game_number = game_number_for_day(yesterday)
-            if game_number is None:
-                raise ValueError(f"Failed to get game number for yesterday: {yesterday}")
-                return
 
             results = await summarizer.get_daily_results(game_number)
             await channel.send(embed=results)
@@ -96,3 +103,36 @@ async def _daily_summary() -> None:
             )
 
     logger.info("Daily summary finished")
+
+
+async def _daily_reminder() -> None:
+    assert services is not None, "Services must exist for jobs to run"
+    logger.info("Daily reminder running")
+    await asyncio.wait_for(services.client.wait_until_ready(), timeout=CLIENT_WAIT_TIMEOUT)
+    today = datetime.now(TIMEZONE).today().date()
+    game_number = game_number_for_day(today)
+    if game_number is None:
+        logger.error(f"Failed to get game number for today: {today}")
+        return
+
+    async for wordle_channel in WordleChannel.objects.aiterator():
+        if not wordle_channel.daily_reminder_enabled:
+            continue
+
+        channel = await services.client.fetch_channel(wordle_channel.channel_id)
+        if not isinstance(channel, discord.TextChannel):
+            continue
+
+        try:
+            summarizer = Summarizer(channel)
+            reminder = await summarizer.get_daily_reminder(game_number)
+            if reminder is not None:
+                await channel.send(embed=reminder)
+
+        except Exception as ex:
+            logger.error(
+                "Unable to post daily reminder to channel: %s",
+                ex,
+                exc_info=ex,
+                extra={"guild_id": channel.guild.id, "channel_id": channel.id},
+            )
