@@ -1,0 +1,17 @@
+version: '3.8'
+
+services:
+  wordle-tracker:
+    image: ghcr.io/robert-mccausland/wordle-tracker:${VERSION}
+    restart: unless-stopped 
+    environment:
+      DB_PATH: /var/lib/wordle-tracker/data/
+      ENVIRONMENT: production
+      SYNC_COMMANDS: "TRUE"
+      TOKEN: ${TOKEN}
+    volumes:
+      - wordle-tracker-data:/var/lib/wordle-tracker/data
+
+volumes:
+  wordle-tracker-data:
+    driver: local
