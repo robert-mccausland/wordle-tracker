@@ -29,10 +29,6 @@ def get_attributes() -> dict[str, str]:
     attributes = {"service.name": "wordle-tracker"}
     version = os.getenv("VERSION")
     if version is not None:
-        attributes["version"] = version
-
-    environment = os.getenv("ENVIRONMENT")
-    if environment is not None:
-        attributes["environment"] = environment
+        attributes["service.versin"] = version
 
     return attributes
