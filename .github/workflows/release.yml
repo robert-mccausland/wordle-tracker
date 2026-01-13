@@ -85,7 +85,7 @@ jobs:
           environment=${{ needs.build.outputs.environment }}
 
           echo "VERSION=$version" > ./deploy/.env
-          echo "ENVIRONMENT=$environment" > ./deploy/.env
+          echo "ENVIRONMENT=$environment" >> ./deploy/.env
           echo "TOKEN=${{ secrets.DISCORD_TOKEN }}" >> ./deploy/.env
 
           gcloud compute ssh apps@${{ env.GCE_INSTANCE_NAME }} \
