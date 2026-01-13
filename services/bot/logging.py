@@ -22,6 +22,7 @@ def setup_logging() -> None:
         set_logger_provider(provider)
 
         handler = LoggingHandler(level=logging.INFO, logger_provider=provider)
+        handler.setFormatter(logging.Formatter("%(message)s"))
         logging.basicConfig(level=logging.INFO, handlers=[handler])
 
 
