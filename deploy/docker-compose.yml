@@ -12,9 +12,18 @@ services:
       VERSION: ${VERSION}
       OTEL_EXPORTER_OTLP_ENDPOINT: "http://grafana-alloy:4317"
       OTEL_EXPORTER_OTLP_PROTOCOL: "grpc"
+      
     volumes:
       - wordle-tracker-data:/var/lib/wordle-tracker/data
+
+    networks:
+     - shared-network
 
 volumes:
   wordle-tracker-data:
     driver: local
+
+networks:
+  shared-network:
+    external: true
+    name: shared-network
