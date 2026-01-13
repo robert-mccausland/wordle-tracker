@@ -6,9 +6,12 @@ services:
     restart: unless-stopped 
     environment:
       DB_PATH: /var/lib/wordle-tracker/data/
-      ENVIRONMENT: production
       SYNC_COMMANDS: "TRUE"
       TOKEN: ${TOKEN}
+      ENVIRONMENT: ${ENVIRONMENT}
+      VERSION: ${VERSION}
+      OTEL_EXPORTER_OTLP_ENDPOINT: "http://grafana-alloy:4317"
+      OTEL_EXPORTER_OTLP_PROTOCOL: "grpc"
     volumes:
       - wordle-tracker-data:/var/lib/wordle-tracker/data
 

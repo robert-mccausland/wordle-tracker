@@ -1,23 +1,38 @@
 import logging
-import json
-from datetime import datetime
+import os
+import sys
+from opentelemetry.exporter.otlp.proto.grpc._log_exporter import OTLPLogExporter
+from opentelemetry.sdk._logs import LoggerProvider, LoggingHandler
+from opentelemetry.sdk._logs.export import BatchLogRecordProcessor, ConsoleLogRecordExporter
+from opentelemetry.sdk.resources import Resource
+from opentelemetry._logs import set_logger_provider
 
 FORWARDED_FIELDS = ["user_id", "guild_id", "channel_id", "name"]
 
 
-class JsonFormatter(logging.Formatter):
-    def format(self, record: logging.LogRecord) -> str:
-        log_record = {
-            "timestamp": datetime.now().isoformat() + "Z",
-            "level": record.levelname.lower(),
-            "message": record.getMessage(),
-        }
+def setup_logging() -> None:
+    if os.getenv("DEBUG") == "TRUE":
+        debug_handler = logging.StreamHandler(sys.stdout)
+        debug_handler.setFormatter(logging.Formatter("%(asctime)s [%(levelname)s] %(name)s: %(message)s"))
+        logging.basicConfig(level=logging.INFO, handlers=[debug_handler])
+    else:
+        provider = LoggerProvider(Resource.create(get_attributes()))
+        provider.add_log_record_processor(BatchLogRecordProcessor(ConsoleLogRecordExporter()))
+        provider.add_log_record_processor(BatchLogRecordProcessor(OTLPLogExporter()))
+        set_logger_provider(provider)
 
-        for field in FORWARDED_FIELDS:
-            if hasattr(record, field):
-                log_record[field] = getattr(record, field)
+        handler = LoggingHandler(level=logging.INFO, logger_provider=provider)
+        logging.basicConfig(level=logging.INFO, handlers=[handler])
 
-        if record.exc_info:
-            log_record["stack"] = self.formatException(record.exc_info)
 
-        return json.dumps(log_record)
+def get_attributes() -> dict[str, str]:
+    attributes = {"service.name": "wordle-tracker"}
+    version = os.getenv("VERSION")
+    if version is not None:
+        attributes["version"] = version
+
+    environment = os.getenv("ENVIRONMENT")
+    if environment is not None:
+        attributes["environment"] = environment
+
+    return attributes
