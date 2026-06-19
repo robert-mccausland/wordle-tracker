@@ -1,5 +1,6 @@
-flake8
-mypy
-django-stubs
-black
-pre-commit
+flake8==7.3.0
+mypy==1.19.1
+django-stubs==5.2.8
+black==25.12.0
+pre-commit==4.5.1
+pytest==9.1.1
