@@ -5,7 +5,7 @@ from services.bot.parser import parse_message, logger, LetterGuess
 
 
 @dataclass(frozen=True)
-class TestCase:
+class ParserTestCase:
     name: str
     message: str
     expected_game_number: int
@@ -16,8 +16,8 @@ class TestCase:
 
 class TestParser(unittest.TestCase):
     def test_parse_result(self) -> None:
-        test_cases: list[TestCase] = [
-            TestCase(
+        test_cases: list[ParserTestCase] = [
+            ParserTestCase(
                 name="hard mode win in 4",
                 message="""Wordle 1,555 4/6*
 
@@ -62,7 +62,7 @@ Look at my result!
                     ],
                 ],
             ),
-            TestCase(
+            ParserTestCase(
                 name="wordle birthday puzzle 1826",
                 message="""Happy 5th Birthday Wordle 🎂
 Wordle 1,826 4/6*
