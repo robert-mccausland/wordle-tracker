@@ -27,3 +27,19 @@ jobs:
 
     - name: Run check
       run: make check
+
+    - name: Run tests
+      run: make test-ci
+
+    - name: Publish test report (PR annotations)
+      uses: mikepenz/action-junit-report@v4
+      if: always()
+      with:
+        report_paths: test-results.xml
+
+    - name: Upload test results
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: test-results-${{ github.run_id }}
+        path: test-results.xml

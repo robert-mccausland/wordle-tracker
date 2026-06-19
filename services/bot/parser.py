@@ -2,7 +2,6 @@ from dataclasses import dataclass
 from enum import Enum
 import logging
 from typing import Optional
-import unittest
 import regex
 
 WORD_LENGTH = 5
@@ -83,7 +82,6 @@ def parse_message(message: str) -> Optional[GameResult]:
     for line in lines[start_index + 2 :]:
         guess = _parse_guess(line)
         if guess is None:
-            logger.warning("Invalid guess parsed, assuming wordle result content is finished")
             break
         guesses.append(guess)
 
@@ -116,11 +114,11 @@ def _parse_int(value: str) -> Optional[int]:
 def _parse_guess(guess: str) -> Optional[list[LetterGuess]]:
     result = []
 
-    # Out of an abundance of caution make sure we do not have a very long string which
-    # could cause some sort of attack vector due to regex being a strange beast.
-    # We do not expect each character to be more than a double character so twice the
+    # We expect each character to be more than a double character so twice the
     # word length should be plenty.
-    if len(guess) > WORD_LENGTH * 2:
+    if len(guess) == 0 or len(guess) > WORD_LENGTH * 2:
+        # If the length of the guess is incorrect we do not surface a warning as
+        # this is is the expected way to detect when the wordle content ends
         return None
 
     graphemes = GRAPHEME_REGEX.findall(guess)
@@ -150,64 +148,3 @@ def _parse_letter_guess(letter_guess: str) -> Optional[LetterGuess]:
             return LetterGuess.NONE
         case _:
             return None
-
-
-class TestParser(unittest.TestCase):
-    def test_parse_result(self) -> None:
-        message = """Wordle 1,555 4/6*
-
-🟩⬛⬛🟨⬛
-🟩🟨🟨⬛🟨
-🟩🟩⬛🟩🟩
-🟩🟩🟩🟩🟩
-
-Look at my result!
-"""
-
-        result = parse_message(message)
-
-        self.assertNoLogs(logger)
-        self.assertIsNotNone(result)
-        if result is None:
-            return
-
-        self.assertEqual(result.game_number, 1555)
-        self.assertTrue(result.is_hard_mode)
-        self.assertTrue(result.is_win)
-        self.assertEqual(
-            result.guesses,
-            [
-                [
-                    LetterGuess.GREEN,
-                    LetterGuess.NONE,
-                    LetterGuess.NONE,
-                    LetterGuess.YELLOW,
-                    LetterGuess.NONE,
-                ],
-                [
-                    LetterGuess.GREEN,
-                    LetterGuess.YELLOW,
-                    LetterGuess.YELLOW,
-                    LetterGuess.NONE,
-                    LetterGuess.YELLOW,
-                ],
-                [
-                    LetterGuess.GREEN,
-                    LetterGuess.GREEN,
-                    LetterGuess.NONE,
-                    LetterGuess.GREEN,
-                    LetterGuess.GREEN,
-                ],
-                [
-                    LetterGuess.GREEN,
-                    LetterGuess.GREEN,
-                    LetterGuess.GREEN,
-                    LetterGuess.GREEN,
-                    LetterGuess.GREEN,
-                ],
-            ],
-        )
-
-
-if __name__ == "__main__":
-    unittest.main()
