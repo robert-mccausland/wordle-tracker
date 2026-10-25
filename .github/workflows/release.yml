@@ -94,7 +94,7 @@ jobs:
               esac
               [ "$mib" -ge 32 ] || errors+=("MEM_LIMIT of at least 32m (got $MEM_LIMIT)")
             else
-              errors+=("valid MEM_LIMIT, e.g. 256m (got $MEM_LIMIT)")
+              errors+=("valid MEM_LIMIT, e.g. 192m (got $MEM_LIMIT)")
             fi
           fi
           if [ ${#errors[@]} -gt 0 ]; then

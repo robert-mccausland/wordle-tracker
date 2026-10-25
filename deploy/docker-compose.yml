@@ -10,8 +10,8 @@ services:
     # environment variable, which the Release workflow writes to .env.
     # docker-compose 1.27.4 honours mem_limit in a version 3.x file
     # (deploy.resources can't cap swap).
-    mem_limit: ${MEM_LIMIT:-256m}
-    memswap_limit: ${MEM_LIMIT:-256m}
+    mem_limit: ${MEM_LIMIT:-192m}
+    memswap_limit: ${MEM_LIMIT:-192m}
     environment:
       DB_PATH: /var/lib/wordle-tracker/data/
       SYNC_COMMANDS: "TRUE"
