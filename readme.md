@@ -98,3 +98,5 @@ make run-bot
 ### Deployment
 
 Code committed to the `main` branch will be automatically deployed.
+
+On the VM the container has a memory limit (default `256m`, swap capped to match) and `restart: unless-stopped`, so a memory leak gets it OOM-killed and restarted rather than starving the other bots on the VM (ZOO-49). To change the limit, set a `MEM_LIMIT` variable (e.g. `384m`) on the GitHub environment and redeploy; see `deploy/docker-compose.yml`.
