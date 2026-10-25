@@ -3,7 +3,6 @@ import asyncio
 from datetime import datetime, timedelta
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.jobstores.sqlalchemy import SQLAlchemyJobStore
-from apscheduler.triggers.cron import CronTrigger
 import logging
 import discord
 
@@ -11,6 +10,7 @@ from apps.core.models import WordleChannel
 from services.bot.config import CLIENT_WAIT_TIMEOUT, TIMEZONE
 from services.bot.scanner import scan_unseen_messages
 from services.bot.summarizer import Summarizer
+from services.bot.triggers import daily_reminder_trigger, daily_summary_trigger, scan_unseen_messages_trigger
 from services.bot.utils import game_number_for_day
 from wordletracker.settings import DB_PATH
 
@@ -38,21 +38,23 @@ class JobScheduler:
             event_loop=event_loop,
             timezone=TIMEZONE,
         )
+        # replace_existing=True overwrites the persisted job (trigger included) on every startup, so changing a
+        # trigger here takes effect on the next deploy without touching scheduler.sqlite.
         self.scheduler.add_job(
             _daily_summary,
-            CronTrigger(hour=9, minute=0, second=0, timezone=TIMEZONE),
+            daily_summary_trigger(TIMEZONE),
             id="daily_summary",
             replace_existing=True,
         )
         self.scheduler.add_job(
             _daily_reminder,
-            CronTrigger(hour=21, minute=0, second=0, timezone=TIMEZONE),
+            daily_reminder_trigger(TIMEZONE),
             id="daily_reminder",
             replace_existing=True,
         )
         self.scheduler.add_job(
             _scan_unseen_messages,
-            CronTrigger(minute="*/5", timezone=TIMEZONE),
+            scan_unseen_messages_trigger(),
             id="scan_unseen_messages",
             replace_existing=True,
         )
