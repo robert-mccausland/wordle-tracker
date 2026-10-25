@@ -79,12 +79,36 @@ jobs:
           project_id: ${{ env.PROJECT_ID }}
           service_account: ${{ env.SERVICE_ACCOUNT }}
 
+      - name: Check deploy settings
+        env:
+          MEM_LIMIT: ${{ vars.MEM_LIMIT }}
+        run: |
+          errors=()
+          if [ -n "$MEM_LIMIT" ]; then
+            # docker-compose only parses MEM_LIMIT during "up", after deploy.sh has
+            # taken the old container down, so a bad value would leave the bot down.
+            if [[ "$MEM_LIMIT" =~ ^([0-9]{1,12})([bkmgBKMG])$ ]]; then
+              n=$((10#${BASH_REMATCH[1]}))
+              case "${BASH_REMATCH[2],,}" in
+                b) mib=$((n / 1048576)) ;; k) mib=$((n / 1024)) ;; m) mib=$n ;; g) mib=$((n * 1024)) ;;
+              esac
+              [ "$mib" -ge 32 ] || errors+=("MEM_LIMIT of at least 32m (got $MEM_LIMIT)")
+            else
+              errors+=("valid MEM_LIMIT, e.g. 192m (got $MEM_LIMIT)")
+            fi
+          fi
+          if [ ${#errors[@]} -gt 0 ]; then
+            printf '::error::Invalid deploy settings: %s\n' "$(IFS=,; echo "${errors[*]}")"
+            exit 1
+          fi
+
       - name: Update docker-compose manifest
         run: |
           version=${{ fromJson(needs.build.outputs.metaJson).labels['org.opencontainers.image.version'] }}
 
           echo "VERSION=$version" > ./deploy/.env
           echo "TOKEN=${{ secrets.DISCORD_TOKEN }}" >> ./deploy/.env
+          echo "MEM_LIMIT=${{ vars.MEM_LIMIT }}" >> ./deploy/.env
 
           gcloud compute ssh apps@${{ env.GCE_INSTANCE_NAME }} \
             --zone=${{ env.GCE_ZONE }} \
